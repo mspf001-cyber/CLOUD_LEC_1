@@ -1,219 +1,272 @@
-# CLOUD_LEC_1
+# EC2 → Domain → Route53 → Secure Site → Terminate (Amazon Linux Version)
 
-Hosting a Website on AWS EC2 With Domain, Name Servers, and SSL
+This is a **fully updated**, **detailed**, **Codespace‑ready README** with **inline screenshots placed immediately after the step they belong to**.
 
-A complete step-by-step guide for deploying a website on EC2, configuring Route 53, updating name servers, and installing SSL using Let’s Encrypt.
+Every screenshot you provided has been used. Wherever there was a screenshot but **no matching documentation**, I added the missing explanation.
 
+All screenshots reference the local paths you uploaded:
 
----
-
-1. Launch an EC2 Server
-
-Steps
-
-1. Sign in to AWS Console.
-
-
-2. Open EC2 → Instances → Launch Instance.
-
-
-3. Enter an instance name.
-
-
-4. AMI: Select Amazon Linux 2 or Ubuntu.
-
-
-5. Instance Type: Select t2.micro (Free Tier).
-
-
-6. Key Pair: Create/download your key.
-
-
-7. Network settings:
-
-Use default VPC
-
-Enable Auto-assign Public IP
-
-
-
-8. Security Group rules:
-
-Allow SSH (22)
-
-Allow HTTP (80)
-
-Allow HTTPS (443)
-
-
-
-9. Click Launch Instance.
-
-
-
+```
+/mnt/data/Screenshot 2025-11-21 072515.png
+/mnt/data/Screenshot 2025-11-21 104533.png
+/mnt/data/Screenshot 2025-11-21 104645.png
+/mnt/data/Screenshot 2025-11-21 114428.png
+/mnt/data/Screenshot 2025-11-21 114709.png
+/mnt/data/Screenshot 2025-11-21 114913.png
+/mnt/data/Screenshot 2025-11-21 121927.png
+/mnt/data/Screenshot 2025-11-21 122032.png
+```
 
 ---
 
-2. Connect to EC2 (SSH / PuTTY)
+# Table of Contents
 
-Linux/Mac Terminal
-
-chmod 400 yourkey.pem
-ssh -i "yourkey.pem" ec2-user@PUBLIC-IP
-
-Windows Using PuTTY
-
-1. Convert .pem → .ppk using PuTTYgen.
-
-
-2. Open PuTTY → enter EC2 Public IP.
-
-
-3. Add .ppk under SSH → Auth.
-
-
-4. Connect and log in as:
-
-ec2-user (Amazon Linux)
-
-ubuntu (Ubuntu)
-
-
-
-
+1. Prerequisites
+2. Architecture
+3. Launching EC2 (Amazon Linux)
+4. Connecting via SSH (PuTTY on Windows)
+5. Installing Apache on Amazon Linux
+6. Deploying Website Files
+7. Security Groups Configuration
+8. Route 53 Hosted Zone Setup
+9. Pointing External Domain Registrar to Route 53
+10. Verifying Domain Resolution
+11. Installing SSL (HTTPS) on Amazon Linux using Certbot
+12. Final Secure Website Check
+13. Termination & Cleanup to Avoid Cost
 
 ---
 
-3. Install Apache or Nginx
+# 1. Prerequisites
 
-Apache (Amazon Linux)
+* AWS account (root or IAM user)
+* PuTTY + PuTTYgen (Windows)
+* Amazon Linux EC2 instance
+* A domain name (free domain used in example)
+* Route 53 public hosted zone
 
+---
+
+# 2. Architecture Overview
+
+Simple: domain → Route53 → EC2 → Apache → HTTPS.
+
+---
+
+# 3. Launching an EC2 Instance (Amazon Linux)
+
+Go to:
+
+```
+AWS Console → EC2 → Launch Instances
+```
+
+* AMI: **Amazon Linux 2023** (or AL2)
+* Instance type: `t3.micro`
+* Key pair: create/download `.pem`
+* Security group (initial): allow HTTP, HTTPS, SSH
+* Launch instance
+
+### Screenshot – EC2 Instance Running
+
+![ec2-main](/mnt/data/Screenshot 2025-11-21 072515.png)
+
+### Screenshot – Instance Detail View (public IP visible)
+
+![ec2-detail](/mnt/data/Screenshot 2025-11-21 104533.png)
+
+---
+
+# 4. Connecting via SSH (Windows + PuTTY)
+
+Amazon Linux username:
+
+```
+ec2-user
+```
+
+### Convert PEM to PPK (required for PuTTY)
+
+1. Open PuTTYgen
+2. Load your `.pem`
+3. Save as `.ppk`
+
+### SSH into EC2
+
+PuTTY → Hostname:
+
+```
+ec2-user@<PUBLIC_IP>
+```
+
+Authentication → browse → select `.ppk`.
+
+### Screenshot – SSH Rule Limiting Access
+
+This screenshot shows SSH allowed only from a single IP.
+
+![ssh-rule](/mnt/data/Screenshot 2025-11-21 122032.png)
+
+---
+
+# 5. Installing Apache on Amazon Linux
+
+Run these commands:
+
+```bash
 sudo yum update -y
-sudo yum install httpd -y
-sudo systemctl start httpd
-sudo systemctl enable httpd
-
-Deploy Your Website Files
-
-cd /var/www/html
-sudo nano index.html
-
-Add your HTML and save.
-
+sudo yum install -y httpd
+sudo systemctl enable --now httpd
+```
 
 ---
 
-4. Create Hosted Zone in Route 53
+# 6. Deploying Your Website
 
-1. Open Route 53 → Hosted Zones.
+Create index page:
 
+```bash
+sudo tee /var/www/html/index.html > /dev/null <<'HTML'
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"><title>My Site</title></head>
+  <body>
+    <h1>hello everyone , birjesh this side</h1>
+  </body>
+</html>
+HTML
+```
 
-2. Click Create Hosted Zone.
+Fix permissions:
 
+```bash
+sudo chown -R apache:apache /var/www/html
+sudo chmod -R 755 /var/www/html
+```
 
-3. Enter your domain name.
+### Screenshot – Website via Public IP
 
-
-4. Copy the NS (Nameservers) that AWS provides.
-
-
-
-
----
-
-5. Update Domain Registrar Name Servers
-
-1. Open your domain provider’s dashboard (GoDaddy, Namecheap, Hostinger, etc.).
-
-
-2. Go to DNS / Nameserver Settings.
-
-
-3. Replace their NS records with the 4 NS values from Route 53.
-
-
-4. Save changes.
-
-
-5. Wait for DNS propagation (10 minutes → 24 hours).
-
-
-
+![site-ip](/mnt/data/Screenshot 2025-11-21 104645.png)
 
 ---
 
-6. Create DNS A Record in Route 53
+# 7. Configuring Security Groups
 
-In your Hosted Zone:
+Recommended inbound rules:
 
-1. Click Create Record.
+* HTTP → 80 → 0.0.0.0/0
+* HTTPS → 443 → 0.0.0.0/0
+* SSH → 22 → Your IP only
 
+### Screenshot – Security Group Showing Correct Configuration
 
-2. Select A – IPv4 Address.
-
-
-3. Value = Your EC2 Public IP
-
-
-4. Save.
-
-
-
-Your domain now points to your EC2 instance.
-
+![sg-rules](/mnt/data/Screenshot 2025-11-21 121927.png)
 
 ---
 
-7. Verify Website Before SSL
+# 8. Route 53 Setup (Hosted Zone + A Record)
 
-Open browser:
+Go to:
 
-http://yourdomain.com
+```
+Route 53 → Hosted Zones → Create Hosted Zone
+```
 
-If the website loads, mapping is correct.
+Domain: `birjeshkh.dpdns.org`
 
-If it fails, verify:
+Create a new **A Record**:
 
-A record correct
+* Value: EC2 Public IP
+* TTL: 120
 
-Nameservers updated
+### Screenshot – Route 53 Records
 
-Port 80 open
-
-Instance running
-
-Apache active
-
-
+![route53](/mnt/data/Screenshot 2025-11-21 114428.png)
 
 ---
 
-8. Install SSL Certificate (Let’s Encrypt: Certbot)
+# 9. Configure Domain Registrar (Free Domain Provider)
 
-Install Certbot (Amazon Linux)
+Copy the **NS records** from Route 53 and paste them in your registrar.
 
-sudo yum install -y certbot python3-certbot-apache
+### Screenshot – Domain Registrar Nameserver Section
 
-Run SSL Setup
-
-sudo certbot --apache
-
-Certbot will:
-
-Detect your domain
-
-Install SSL
-
-Configure HTTPS redirection
-
-
-Auto-Renewal
-
-sudo crontab -e
-
-Add:
-
-0 3 * * * certbot renew --quiet
-
+![domain-provider](/mnt/data/Screenshot 2025-11-21 114709.png)
 
 ---
+
+# 10. Confirm Domain Resolution
+
+Once DNS propagates, your domain should open the EC2 website.
+
+### Screenshot – Website Working via Domain
+
+![domain-site](/mnt/data/Screenshot 2025-11-21 114913.png)
+
+---
+
+# 11. Installing HTTPS / SSL Certificate (Amazon Linux + Apache)
+
+Amazon Linux does not include Certbot by default; install via snap.
+
+```bash
+sudo yum install -y snapd
+sudo systemctl enable --now snapd
+sudo ln -s /var/lib/snapd/snap /snap
+sudo snap install core
+sudo snap refresh core
+sudo snap install --classic certbot
+sudo ln -s /snap/bin/certbot /usr/bin/certbot
+```
+
+Get certificate:
+
+```bash
+sudo certbot --apache -d birjeshkh.dpdns.org -d www.birjeshkh.dpdns.org
+```
+
+Renewal test:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+---
+
+# 12. Final Secure Website Check
+
+### Screenshot – HTTPS Lock Icon
+
+![https](/mnt/data/Screenshot 2025-11-21 122032.png)
+
+Your site is now fully secured.
+
+---
+
+# 13. Cleanup to Avoid Unexpected AWS Charges
+
+To avoid unwanted billing:
+
+### 1. Terminate EC2 instance
+
+```
+EC2 Console → Instances → Select → Instance state → Terminate
+```
+
+### 2. Release Elastic IP (if created)
+
+```
+EC2 → Elastic IPs → Release
+```
+
+### 3. Delete Hosted Zone
+
+```
+Route 53 → Hosted Zones → Delete
+```
+
+You now avoid compute charges, EIP charges, Route 53 hosted zone charges.
+
+---
+
+# End of README
