@@ -1,272 +1,190 @@
-# EC2 → Domain → Route53 → Secure Site → Terminate (Amazon Linux Version)
+# ☁️ AWS EC2 Web Server Deployment: From Launch to SSL
 
-This is a **fully updated**, **detailed**, **Codespace‑ready README** with **inline screenshots placed immediately after the step they belong to**.
+![AWS](https://img.shields.io/badge/Cloud-AWS-232F3E?style=for-the-badge&logo=amazon-aws)
+![Linux](https://img.shields.io/badge/OS-Amazon_Linux_2023-F7931E?style=for-the-badge&logo=linux)
+![Apache](https://img.shields.io/badge/Server-Apache_httpd-D22128?style=for-the-badge&logo=apache)
+![SSL](https://img.shields.io/badge/Security-Let's_Encrypt-003A70?style=for-the-badge&logo=letsencrypt)
 
-Every screenshot you provided has been used. Wherever there was a screenshot but **no matching documentation**, I added the missing explanation.
+## 📖 Project Overview
+This project documents the complete lifecycle of deploying a secure, static web application on the AWS Cloud. It demonstrates proficiency in **Cloud Infrastructure (EC2)**, **Linux System Administration**, **Networking (DNS/Route 53)**, and **Cybersecurity (SSL/TLS)**.
 
-All screenshots reference the local paths you uploaded:
-
-```
-/mnt/data/Screenshot 2025-11-21 072515.png
-/mnt/data/Screenshot 2025-11-21 104533.png
-/mnt/data/Screenshot 2025-11-21 104645.png
-/mnt/data/Screenshot 2025-11-21 114428.png
-/mnt/data/Screenshot 2025-11-21 114709.png
-/mnt/data/Screenshot 2025-11-21 114913.png
-/mnt/data/Screenshot 2025-11-21 121927.png
-/mnt/data/Screenshot 2025-11-21 122032.png
-```
+**Live Demo Domain:** `https://birjeshkh.dpdns.org` *(Note: Infrastructure may be terminated to save costs)*
 
 ---
 
-# Table of Contents
-
-1. Prerequisites
-2. Architecture
-3. Launching EC2 (Amazon Linux)
-4. Connecting via SSH (PuTTY on Windows)
-5. Installing Apache on Amazon Linux
-6. Deploying Website Files
-7. Security Groups Configuration
-8. Route 53 Hosted Zone Setup
-9. Pointing External Domain Registrar to Route 53
-10. Verifying Domain Resolution
-11. Installing SSL (HTTPS) on Amazon Linux using Certbot
-12. Final Secure Website Check
-13. Termination & Cleanup to Avoid Cost
+## 📑 Table of Contents
+1. [Phase 1: Infrastructure Setup](#phase-1-infrastructure-setup)
+2. [Phase 2: Web Server Configuration](#phase-2-web-server-configuration)
+3. [Phase 3: Domain Mapping (DNS)](#phase-3-domain-mapping-dns)
+4. [Phase 4: SSL Security Implementation](#phase-4-ssl-security-implementation)
+5. [Phase 5: Cost Optimization (Teardown)](#phase-5-cost-optimization-teardown)
+6. [Troubleshooting & Lessons Learned](#-troubleshooting--lessons-learned)
 
 ---
 
-# 1. Prerequisites
+## Phase 1: Infrastructure Setup
 
-* AWS account (root or IAM user)
-* PuTTY + PuTTYgen (Windows)
-* Amazon Linux EC2 instance
-* A domain name (free domain used in example)
-* Route 53 public hosted zone
+### 1.1 Instance Launch
+* **Provider:** AWS EC2 (Elastic Compute Cloud)
+* **Region:** `us-east-1` (N. Virginia)
+* **AMI:** **Amazon Linux 2023** (The successor to Amazon Linux 2)
+* **Instance Type:** `t3.micro` (Free Tier Eligible)
+* **Key Pair:** Generated `.pem` file for SSH authentication.
 
----
+### 1.2 SSH Access (Windows)
+Since the default `.pem` format is incompatible with PuTTY on Windows, a conversion was required.
+1.  **Tool:** PuTTYgen
+2.  **Action:** Converted `key.pem` → `key.ppk`.
+3.  **Login:** Used **PuTTY** to connect via port 22.
+    * *User:* `ec2-user`
+    * *Host:* [Public IP Address]
 
-# 2. Architecture Overview
-
-Simple: domain → Route53 → EC2 → Apache → HTTPS.
-
----
-
-# 3. Launching an EC2 Instance (Amazon Linux)
-
-Go to:
-
-```
-AWS Console → EC2 → Launch Instances
-```
-
-* AMI: **Amazon Linux 2023** (or AL2)
-* Instance type: `t3.micro`
-* Key pair: create/download `.pem`
-* Security group (initial): allow HTTP, HTTPS, SSH
-* Launch instance
-
-### Screenshot – EC2 Instance Running
-
-![ec2-main](/mnt/data/Screenshot 2025-11-21 072515.png)
-
-### Screenshot – Instance Detail View (public IP visible)
-
-![ec2-detail](/mnt/data/Screenshot 2025-11-21 104533.png)
+> **Status Verified:** Successfully logged into the Amazon Linux 2023 terminal.
+> ![Instance Dashboard](assets/Screenshot%202025-11-21%20104645.png)
 
 ---
 
-# 4. Connecting via SSH (Windows + PuTTY)
+## Phase 2: Web Server Configuration
 
-Amazon Linux username:
-
-```
-ec2-user
-```
-
-### Convert PEM to PPK (required for PuTTY)
-
-1. Open PuTTYgen
-2. Load your `.pem`
-3. Save as `.ppk`
-
-### SSH into EC2
-
-PuTTY → Hostname:
-
-```
-ec2-user@<PUBLIC_IP>
-```
-
-Authentication → browse → select `.ppk`.
-
-### Screenshot – SSH Rule Limiting Access
-
-This screenshot shows SSH allowed only from a single IP.
-
-![ssh-rule](/mnt/data/Screenshot 2025-11-21 122032.png)
-
----
-
-# 5. Installing Apache on Amazon Linux
-
-Run these commands:
+### 2.1 Installing Apache
+Amazon Linux 2023 uses `dnf` as the package manager.
 
 ```bash
-sudo yum update -y
-sudo yum install -y httpd
-sudo systemctl enable --now httpd
-```
+# Update system packages
+sudo dnf update -y
 
----
+# Install Apache HTTP Server
+sudo dnf install httpd -y
 
-# 6. Deploying Your Website
+# Start the service
+sudo systemctl start httpd
 
-Create index page:
+# Enable auto-start on reboot
+sudo systemctl enable httpd
+``` 
 
+### 2.2 Configuring the Firewall (Security Groups)
+Initially, the website was inaccessible. This was due to the default AWS Security Group rules blocking inbound web traffic.
+
+Action Taken: Modified Inbound Rules in AWS Console.
+
+SSH (22): Restricted to My IP (Admin access).
+
+HTTP (80): Open to 0.0.0.0/0 (Public).
+
+HTTPS (443): Open to 0.0.0.0/0 (Secure traffic - added in Phase 4).
+
+### 2.3 Deploying Content
 ```bash
-sudo tee /var/www/html/index.html > /dev/null <<'HTML'
-<!doctype html>
-<html>
-  <head><meta charset="utf-8"><title>My Site</title></head>
-  <body>
-    <h1>hello everyone , birjesh this side</h1>
-  </body>
-</html>
-HTML
+# Overwrite index.html
+sudo sh -c 'echo "<b>any message</b>" > /var/www/html/index.html'
 ```
+Result: The website became visible over HTTP.
 
-Fix permissions:
+## Phase 3: Domain Mapping (DNS)
+### 3.1 Domain Registration
+Registrar: DigitalPlat
 
+Domain: birjeshkh.dpdns.org
+
+### 3.2 AWS Route 53 Integration
+To utilize AWS's advanced DNS routing, I migrated the Nameservers.
+
+Created a Hosted Zone in AWS Route 53.
+
+Extracted the 4 AWS Nameservers (ns-xxx.awsdns...).
+
+Updated the Registrar's configuration to point to these AWS servers.
+
+### 3.3 Record Creation
+Created an A Record to map the domain to the server's IP.
+
+Type: A
+
+Value: 34.230.76.188 (EC2 Public IP)
+
+TTL: 120 seconds (Short TTL allowed for rapid propagation testing).
+
+Routing: Simple Routing.
+
+## Phase 4: SSL Security Implementation
+To resolve the "Not Secure" browser warning, I implemented HTTPS using Let's Encrypt.
+
+### 4.1 Installation
+```Bash
+# Install Certbot and Apache plugin for AL2023
+sudo dnf install -y certbot python3-certbot-apache
+```
+### 4.2 VirtualHost Configuration
+Certbot initially failed because Apache didn't explicitly define the domain name. I manually configured the VirtualHost.
+
+File: /etc/httpd/conf.d/birjesh_ssl.conf
+
+```Apache
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/html
+    ServerName birjeshkh.dpdns.org
+    ErrorLog /var/log/httpd/error.log
+    CustomLog /var/log/httpd/access.log combined
+</VirtualHost>
+```
+### 4.3 Generating the certificate
 ```bash
-sudo chown -R apache:apache /var/www/html
-sudo chmod -R 755 /var/www/html
+sudo systemctl restart httpd
+sudo certbot --apache
 ```
+Selected the domain birjeshkh.dpdns.org.
 
-### Screenshot – Website via Public IP
+Enabled automatic redirects (HTTP -> HTTPS).
 
-![site-ip](/mnt/data/Screenshot 2025-11-21 104645.png)
+Final Result: The website is now fully secured with a valid SSL certificate.
 
----
+## Phase 5: Cost Optimization (Teardown)
+To adhere to the "Student Budget" protocol ($0.00 billing), a strict teardown process was followed immediately after project completion.
 
-# 7. Configuring Security Groups
+🛑 The "Scorched Earth" Checklist
+Terminate Instance:
 
-Recommended inbound rules:
+EC2 Dashboard -> Instance State -> Terminate.
 
-* HTTP → 80 → 0.0.0.0/0
-* HTTPS → 443 → 0.0.0.0/0
-* SSH → 22 → Your IP only
+Verifies that compute charges stop immediately.
 
-### Screenshot – Security Group Showing Correct Configuration
+Delete Route 53 Hosted Zone:
 
-![sg-rules](/mnt/data/Screenshot 2025-11-21 121927.png)
+Step A: Deleted all records inside the zone (A, CNAME) except NS and SOA.
 
----
+Step B: Deleted the Hosted Zone itself.
 
-# 8. Route 53 Setup (Hosted Zone + A Record)
+Prevents the $0.50/month recurring fee.
 
-Go to:
+Release Elastic IP:
 
-```
-Route 53 → Hosted Zones → Create Hosted Zone
-```
+Network & Security -> Elastic IPs -> Release Address.
 
-Domain: `birjeshkh.dpdns.org`
+Prevents hourly penalty for unused static IPs.
 
-Create a new **A Record**:
+Cleanup EBS Volumes:
 
-* Value: EC2 Public IP
-* TTL: 120
+Verified that the root volume was deleted automatically upon instance termination.
 
-### Screenshot – Route 53 Records
+## 💡 Troubleshooting & Lessons Learned
 
-![route53](/mnt/data/Screenshot 2025-11-21 114428.png)
+This project involved navigating several common pitfalls in cloud deployment. Below is a log of issues encountered and their solutions.
 
----
+### 🔧 Troubleshooting Log
 
-# 9. Configure Domain Registrar (Free Domain Provider)
+| Issue / Error Message | Root Cause | Solution |
+| :--- | :--- | :--- |
+| **"This site can't be reached"** (Timeout) | AWS Security Groups block all inbound traffic by default. | **Action:** Added an Inbound Rule for `HTTP` (Port 80) allowing Source `0.0.0.0/0`. |
+| **"Unable to find a virtual host listening on port 80"** | Certbot failed because Apache did not have a specific `ServerName` configuration for the domain. | **Action:** Created a custom config file at `/etc/httpd/conf.d/birjesh_ssl.conf` defining the `<VirtualHost>`. |
+| **HTTPS Connection Timeout** | After installing SSL, the site refused to load despite the certificate being valid. | **Action:** The Security Group allowed Port 80 but blocked Port 443. Added an Inbound Rule for `HTTPS` (Port 443). |
+| **"The specified hosted zone contains non-required resource record sets"** | Attempted to delete the Route 53 Hosted Zone while it still contained custom records. | **Action:** Manually deleted the `A` records inside the zone *before* deleting the Hosted Zone itself. |
+| **PuTTY "Connection Refused"** | Accidentally replaced the SSH rule (Port 22) with the HTTP rule (Port 80) instead of adding a new one. | **Action:** Modified Security Group to ensure **BOTH** Port 22 (SSH) and Port 80 (HTTP) were open. |
 
-Copy the **NS records** from Route 53 and paste them in your registrar.
+### 🧠 Key Lessons Learned
 
-### Screenshot – Domain Registrar Nameserver Section
-
-![domain-provider](/mnt/data/Screenshot 2025-11-21 114709.png)
-
----
-
-# 10. Confirm Domain Resolution
-
-Once DNS propagates, your domain should open the EC2 website.
-
-### Screenshot – Website Working via Domain
-
-![domain-site](/mnt/data/Screenshot 2025-11-21 114913.png)
-
----
-
-# 11. Installing HTTPS / SSL Certificate (Amazon Linux + Apache)
-
-Amazon Linux does not include Certbot by default; install via snap.
-
-```bash
-sudo yum install -y snapd
-sudo systemctl enable --now snapd
-sudo ln -s /var/lib/snapd/snap /snap
-sudo snap install core
-sudo snap refresh core
-sudo snap install --classic certbot
-sudo ln -s /snap/bin/certbot /usr/bin/certbot
-```
-
-Get certificate:
-
-```bash
-sudo certbot --apache -d birjeshkh.dpdns.org -d www.birjeshkh.dpdns.org
-```
-
-Renewal test:
-
-```bash
-sudo certbot renew --dry-run
-```
-
----
-
-# 12. Final Secure Website Check
-
-### Screenshot – HTTPS Lock Icon
-
-![https](/mnt/data/Screenshot 2025-11-21 122032.png)
-
-Your site is now fully secured.
-
----
-
-# 13. Cleanup to Avoid Unexpected AWS Charges
-
-To avoid unwanted billing:
-
-### 1. Terminate EC2 instance
-
-```
-EC2 Console → Instances → Select → Instance state → Terminate
-```
-
-### 2. Release Elastic IP (if created)
-
-```
-EC2 → Elastic IPs → Release
-```
-
-### 3. Delete Hosted Zone
-
-```
-Route 53 → Hosted Zones → Delete
-```
-
-You now avoid compute charges, EIP charges, Route 53 hosted zone charges.
-
----
-
-# End of README
+1.  **OS Differences Matter:** Amazon Linux 2023 uses `dnf` instead of `yum` or `apt`. Copy-pasting generic Linux commands (like for Ubuntu) will fail.
+2.  **The "Firewall" is Outside:** Unlike local servers, AWS security is managed at the network level (Security Groups), not just inside the OS. Opening a port in Apache is useless if AWS blocks it.
+3.  **Cost Management:** "Closing the window" does not stop billing. You must explicitly **Terminate** instances and **Delete** Route 53 zones to ensure a $0.00 bill.
+4.  **DNS Propagation:** Setting a low **TTL** (Time To Live) like 60 seconds is crucial during testing. It allows DNS changes to reflect almost immediately, preventing long waits after making mistakes.
