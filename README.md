@@ -18,19 +18,19 @@ This project documents the complete lifecycle of deploying a secure, static web 
 3. [Phase 3: Domain Mapping (DNS)](#phase-3-domain-mapping-dns)
 4. [Phase 4: SSL Security Implementation](#phase-4-ssl-security-implementation)
 5. [Phase 5: Cost Optimization (Teardown)](#phase-5-cost-optimization-teardown)
-6. [Troubleshooting & Lessons Learned](#-troubleshooting--lessons-learned)
+6. [Phase 6: Troubleshooting & Lessons Learned](#phase-6-troubleshooting--lessons-learned)
 
 ---
 
 ## Phase 1: Infrastructure Setup
 
 ### 1.1 Instance Launch
+![Instance Dashboard](Screenshot%202025-11-21%20104645.png)
 * **Provider:** AWS EC2 (Elastic Compute Cloud)
 * **Region:** `us-east-1` (N. Virginia)
 * **AMI:** **Amazon Linux 2023** (The successor to Amazon Linux 2)
 * **Instance Type:** `t3.micro` (Free Tier Eligible)
 * **Key Pair:** Generated `.pem` file for SSH authentication.
-
 ### 1.2 SSH Access (Windows)
 Since the default `.pem` format is incompatible with PuTTY on Windows, a conversion was required.
 1.  **Tool:** PuTTYgen
@@ -64,6 +64,7 @@ sudo systemctl enable httpd
 ``` 
 
 ### 2.2 Configuring the Firewall (Security Groups)
+![Security Group Rules](Screenshot%202025-11-21%20121927.png)
 Initially, the website was inaccessible. This was due to the default AWS Security Group rules blocking inbound web traffic.
 
 Action Taken: Modified Inbound Rules in AWS Console.
@@ -73,18 +74,18 @@ SSH (22): Restricted to My IP (Admin access).
 HTTP (80): Open to 0.0.0.0/0 (Public).
 
 HTTPS (443): Open to 0.0.0.0/0 (Secure traffic - added in Phase 4).
-
 ### 2.3 Deploying Content
 ```bash
 # Overwrite index.html
 sudo sh -c 'echo "<b>any message</b>" > /var/www/html/index.html'
 ```
+![HTTP Test Page](Screenshot%202025-11-21%20104533.png)
 Result: The website became visible over HTTP.
 
 ## Phase 3: Domain Mapping (DNS)
 ### 3.1 Domain Registration
 Registrar: DigitalPlat
-
+![Registrar Dashboard](Screenshot%202025-11-21%20114709.png)
 Domain: birjeshkh.dpdns.org
 
 ### 3.2 AWS Route 53 Integration
@@ -97,6 +98,7 @@ Extracted the 4 AWS Nameservers (ns-xxx.awsdns...).
 Updated the Registrar's configuration to point to these AWS servers.
 
 ### 3.3 Record Creation
+![Route 53 Config](Screenshot%202025-11-21%20114428.png)
 Created an A Record to map the domain to the server's IP.
 
 Type: A
@@ -106,7 +108,8 @@ Value: 34.230.76.188 (EC2 Public IP)
 TTL: 120 seconds (Short TTL allowed for rapid propagation testing).
 
 Routing: Simple Routing.
-
+> **Verification:** The domain `birjeshkh.dpdns.org` successfully resolves to the server, though it is not yet secure.
+![Domain Propagation Test](Screenshot%202025-11-21%20114913.png)
 ## Phase 4: SSL Security Implementation
 To resolve the "Not Secure" browser warning, I implemented HTTPS using Let's Encrypt.
 
@@ -130,6 +133,7 @@ File: /etc/httpd/conf.d/birjesh_ssl.conf
 </VirtualHost>
 ```
 ### 4.3 Generating the certificate
+
 ```bash
 sudo systemctl restart httpd
 sudo certbot --apache
@@ -137,7 +141,7 @@ sudo certbot --apache
 Selected the domain birjeshkh.dpdns.org.
 
 Enabled automatic redirects (HTTP -> HTTPS).
-
+![Secure HTTPS Site](Screenshot%202025-11-21%20122032.png)
 Final Result: The website is now fully secured with a valid SSL certificate.
 
 ## Phase 5: Cost Optimization (Teardown)
@@ -168,7 +172,7 @@ Cleanup EBS Volumes:
 
 Verified that the root volume was deleted automatically upon instance termination.
 
-## 💡 Troubleshooting & Lessons Learned
+## Phase 6: Troubleshooting & Lessons Learned
 
 This project involved navigating several common pitfalls in cloud deployment. Below is a log of issues encountered and their solutions.
 
