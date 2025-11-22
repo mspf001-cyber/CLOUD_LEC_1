@@ -39,9 +39,6 @@ Since the default `.pem` format is incompatible with PuTTY on Windows, a convers
     * *User:* `ec2-user`
     * *Host:* [Public IP Address]
 
-> **Status Verified:** Successfully logged into the Amazon Linux 2023 terminal.
-> ![Instance Dashboard](assets/Screenshot%202025-11-21%20104645.png)
-
 ---
 
 ## Phase 2: Web Server Configuration
